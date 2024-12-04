@@ -25,6 +25,7 @@ export default function App() {
         </Link>
         <Link to="/app/additional">Additional page</Link>
         <Link to="/app/products">Product page</Link>
+        <Link to="/app/addproducts">Add Product</Link>
 
 
       </NavMenu>

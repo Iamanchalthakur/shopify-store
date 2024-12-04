@@ -59,11 +59,12 @@ export const loader = async ({ request }) => {
       }
     );
 
-    const data = await response.json();
+    const res = await response.json();
     
-  
+  console.log("===data====", res);
+
     return json({
-      products: data.data.products.edges
+      products: res.data.products.edges
     });
   } catch (error) {
     console.error("Error fetching products:", error);
@@ -82,16 +83,23 @@ export default function Products() {
     return <div className="p-4 text-red-500">Error: {error}</div>;
   }
 
-  const rows = products.map(({ node: product }) => {
+  const rows = products.map(({ node: product }) => 
+    {
     const firstImage = product.images.edges[0]?.node;
     const price = product.priceRangeV2.minVariantPrice.amount;
     const currencyCode = product.priceRangeV2.minVariantPrice.currencyCode;
     
+    console.log("====products===", products);
+    
+
+    
+
     const formattedPrice = new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currencyCode
     }).format(price);
 
+    
     return [
       <Box padding="2">
         <Thumbnail
