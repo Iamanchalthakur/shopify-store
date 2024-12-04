@@ -50,7 +50,31 @@ const CREATE_PRODUCT_WITH_OPTIONS = `
   }
 `;
 
-
+const ADD_PRODUCT_PRICE = `
+  mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+  productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+    product {
+      id
+    }
+    productVariants {
+      id
+      metafields(first: 2) {
+        edges {
+          node {
+            namespace
+            key
+            value
+          }
+        }
+      }
+    }
+    userErrors {
+      field
+      message
+    }
+  }
+}
+`;
 
 
 export const action = async ({ request }) => {
@@ -59,7 +83,7 @@ export const action = async ({ request }) => {
 
   // Extract form values
   const title = formData.get("title");
-  const description = formData.get("description");
+  const descriptionHtml = formData.get("description");
   const vendor = formData.get("vendor");
   const productType = formData.get("productType");
   const price = formData.get("price");
@@ -67,57 +91,86 @@ export const action = async ({ request }) => {
   const status = formData.get("status");
 
  
-  const productInput = {
-    title,
-    descriptionHtml: description,
-    vendor,
-    productType,
-    status,
-    variants: [
-      {
-        price: parseFloat(price),
-        inventoryQuantity: parseInt(inventory, 10),
-      },
-    ],
-    metafields: [
-      {
-        namespace: "my_field",
-        key: "liner_material",
-        type: "single_line_text_field",
-        value: "Synthetic Leather",
-      },
-    ],
-    seo: {
-      title: `SEO: ${title}`,
-      description: `SEO Description for ${title}`,
+const productInput = {
+  title,
+  descriptionHtml,
+  productType,
+  vendor,
+  "tags":"aksdfjk,jdsflk,adsjfl",
+  "metafields": [
+    {
+      "namespace": "my_field",
+      "key": "liner_material",
+      "type": "single_line_text_field",
+      "value": "Synthetic Leather"
+    }
+  ],
+  "seo": {
+    "title": "seo tilt",
+    "description": "seo description"
+  },
+  "productOptions": [
+    {
+      "name": "Color",
+      "values": [
+        {
+          "name": "Red"
+        },
+        {
+          "name": "Green"
+        }
+      ]
     },
-  };
-  console.log("===Product Input:===", productInput);
-
+    {
+      "name": "Size",
+      "values": [
+        {
+          "name": "Small"
+        },
+        {
+          "name": "Medium"
+        }
+      ]
+    }
+  ]
+}
 
   try {
-    console.log("==== Step1 ====");
     
     const response = await admin.graphql(CREATE_PRODUCT_WITH_OPTIONS, {
       variables: { input: productInput },
     });
   
-    console.log("===Step2===", response);
+
+    const rawResponse = await response.json();
+
+
+    const priceInput = {
+      "productId": rawResponse.data.productCreate.product.id,
+      "variants": [
+        {
+          "id": rawResponse.data.productCreate.product.variants.nodes[0].id,
+          "price": price,
+          "compareAtPrice": "179.99"
+        }
+      ]
+    } 
+
+ 
+    const PriceResponse = await admin.graphql(ADD_PRODUCT_PRICE, {
+      variables: { input: priceInput },
+    });
   
+
+    const rpResponse = await PriceResponse.json();
+
+
+console.log("-----rpResponse--",rpResponse)
+
+    console.log("===Step3 the id ===", rawResponse.data.productCreate.product.variants.nodes[0].id);
     
-    const rawResponse = await response.text();
-    console.log("===Step3 ===", rawResponse);
-    
-    if (data?.data?.productCreate?.userErrors?.length > 0) {
-      console.log("User Errors:", data.data.productCreate.userErrors);
-      return json({
-        errors: data.data.productCreate.userErrors,
-        values: Object.fromEntries(formData),
-      });
-    }
-  
-    console.log("=== Product Created Successfully ===");
-    return redirect("/app/products");
+   
+   // return redirect("/app/products");
   
   } catch (error) {
     console.error("Unexpected Error:", error);
