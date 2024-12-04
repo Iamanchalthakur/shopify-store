@@ -96,40 +96,36 @@ export const action = async ({ request }) => {
 
 
   try {
-    console.log("==== Step1 ====");
-    
-    const response = await admin.graphql(CREATE_PRODUCT_WITH_OPTIONS, {
-      variables: { input: productInput },
-    });
-  
-    console.log("===Step2===", response);
-  
-    
-    const rawResponse = await response.text();
-    console.log("===Step3 ===", rawResponse);
-    
-    if (data?.data?.productCreate?.userErrors?.length > 0) {
-      console.log("User Errors:", data.data.productCreate.userErrors);
+    const response = await admin.graphql(
+      CREATE_PRODUCT_MUTATION,
+      {
+        variables: {
+          input: productInput,
+        },
+      }
+    );
+
+    const data = await response.json();
+
+    if (data.data.productCreate.userErrors.length > 0) {
       return json({
         errors: data.data.productCreate.userErrors,
         values: Object.fromEntries(formData),
       });
     }
-  
-    console.log("=== Product Created Successfully ===");
+
     return redirect("/app/products");
-  
   } catch (error) {
-    console.error("Unexpected Error:", error);
-  
-    
+    console.error(error)
     return json({
       errors: [{ message: "Failed to create product" }],
+
       values: Object.fromEntries(formData),
     });
   }
-  
 };
+  
+
 
 export default function NewProduct() {
   const actionData = useActionData();
