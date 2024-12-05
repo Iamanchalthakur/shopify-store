@@ -1,4 +1,3 @@
-// app/routes/app.products.new.jsx
 import { json, redirect } from "@remix-run/node";
 import { useActionData, useSubmit } from "@remix-run/react";
 import { useState } from "react";
@@ -15,8 +14,8 @@ import {
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 
-const CREATE_PRODUCT_WITH_OPTIONS = `
-  mutation CreateProductWithOptions($input: ProductInput!) {
+const CREATE_PRODUCT_WITH_OPTIONS = 
+  `mutation CreateProductWithOptions($input: ProductInput!) {
     productCreate(input: $input) {
       userErrors {
         field
@@ -47,85 +46,134 @@ const CREATE_PRODUCT_WITH_OPTIONS = `
         }
       }
     }
-  }
-`;
+  }`;
 
-
-
+const ADD_PRODUCT_PRICE = 
+  `mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+    productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+      product {
+        id
+      }
+      productVariants {
+        id
+        metafields(first: 2) {
+          edges {
+            node {
+              namespace
+              key
+              value
+            }
+          }
+        }
+      }
+      userErrors {
+        field
+        message
+      }
+    }
+  }`;
 
 export const action = async ({ request }) => {
   const { admin } = await authenticate.admin(request);
   const formData = await request.formData();
 
-  // Extract form values
+ 
   const title = formData.get("title");
-  const description = formData.get("description");
+  const descriptionHtml = formData.get("description");
   const vendor = formData.get("vendor");
   const productType = formData.get("productType");
   const price = formData.get("price");
   const inventory = formData.get("inventory");
   const status = formData.get("status");
 
- 
   const productInput = {
     title,
-    descriptionHtml: description,
-    vendor,
+    descriptionHtml,
     productType,
-    status,
-    variants: [
-      {
-        price: parseFloat(price),
-        inventoryQuantity: parseInt(inventory, 10),
-      },
-    ],
+    vendor,
+    tags: "aksdfjk,jdsflk,adsjfl",
     metafields: [
       {
         namespace: "my_field",
         key: "liner_material",
         type: "single_line_text_field",
-        value: "Synthetic Leather",
-      },
+        value: "Synthetic Leather"
+      }
     ],
     seo: {
-      title: `SEO: ${title}`,
-      description: `SEO Description for ${title}`,
+      title: "seo tilt",
+      description: "seo description"
     },
+    productOptions: [
+      {
+        name: "Color",
+        values: [
+          { name: "Red" },
+          { name: "Green" }
+        ]
+      },
+      {
+        name: "Size",
+        values: [
+          { name: "Small" },
+          { name: "Medium" }
+        ]
+      }
+    ]
   };
-  console.log("===Product Input:===", productInput);
-
 
   try {
-    const response = await admin.graphql(
-      CREATE_PRODUCT_MUTATION,
-      {
-        variables: {
-          input: productInput,
-        },
-      }
-    );
+    console.log("====step1====");
+    
+    const response = await admin.graphql(CREATE_PRODUCT_WITH_OPTIONS, {
+      variables: { input: productInput },
+    });
 
-    const data = await response.json();
+    console.log("====response====", response);
 
-    if (data.data.productCreate.userErrors.length > 0) {
-      return json({
-        errors: data.data.productCreate.userErrors,
-        values: Object.fromEntries(formData),
-      });
+    const rawResponse = await response.json();
+    
+    if (rawResponse.errors) {
+      throw new Error("Failed to create product: " + rawResponse.errors[0].message);
     }
+ 
+    const productId = rawResponse.data.productCreate.product.id;
+    const productVariantId = rawResponse.data.productCreate.product.variants.nodes[0].id;
 
+    const priceInput = {
+      productId,
+      variants: [
+        {
+          id: productVariantId,
+          price,
+          compareAtPrice: "179.99",  
+        }
+      ]
+    };
+    console.log("====step3====", productId);
+    console.log("====step4====", productVariantId);
+    console.log("====priceInput====", priceInput);
+
+
+    const PriceResponse = await admin.graphql(ADD_PRODUCT_PRICE, {
+      variables: priceInput,
+    });
+
+    const rpResponse = await PriceResponse.json();
+    if (rpResponse.errors) {
+      throw new Error("Failed to update product price: " + rpResponse.errors[0].message);
+    }
     return redirect("/app/products");
-  } catch (error) {
-    console.error(error)
-    return json({
-      errors: [{ message: "Failed to create product" }],
 
+  } catch (error) {
+    console.error("Unexpected Error:", error);
+
+    return json({
+      errors: [{ message: error.message || "Failed to create product" }],
       values: Object.fromEntries(formData),
     });
   }
 };
-  
-
 
 export default function NewProduct() {
   const actionData = useActionData();
